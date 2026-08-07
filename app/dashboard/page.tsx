@@ -1,15 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import dynamic from 'next/dynamic';
+import type { MapboxMapRef, Incident } from '@/components/MapboxMap';
 
-interface Incident {
-  id: string;
-  street: string;
-  severity: 'HIGH' | 'MED' | 'LOW';
-  type: string;
-  time: string;
-  color: 'error' | 'secondary' | 'tertiary';
-}
+const MapboxMap = dynamic(
+  () => import('@/components/MapboxMap').then((mod) => mod.MapboxMap),
+  { ssr: false }
+);
 
 const initialIncidents: Incident[] = [
   {
@@ -19,6 +17,8 @@ const initialIncidents: Incident[] = [
     type: 'Cluster of 3 potholes detected via mobile sensor-104.',
     time: '14:02:44',
     color: 'error',
+    lng: 79.8510,
+    lat: 6.8912,
   },
   {
     id: '2',
@@ -27,6 +27,8 @@ const initialIncidents: Incident[] = [
     type: 'Minor vertical displacement detected. Baseline shift noted.',
     time: '13:58:12',
     color: 'secondary',
+    lng: 79.8530,
+    lat: 6.8985,
   },
   {
     id: '3',
@@ -35,23 +37,31 @@ const initialIncidents: Incident[] = [
     type: 'Surface friction anomaly detected. Likely debris.',
     time: '13:45:00',
     color: 'tertiary',
+    lng: 79.8518,
+    lat: 6.9050,
   },
 ];
 
 const samplePool = [
-  { street: 'Duplication Rd', severity: 'HIGH' as const, type: 'Severe Depression detected via smart-cam probe.', color: 'error' as const },
-  { street: 'Havelock Rd', severity: 'LOW' as const, type: 'Surface Crack identified.', color: 'tertiary' as const },
-  { street: 'Baseline Rd - Sector C', severity: 'MED' as const, type: 'Edge break & pothole risk detected.', color: 'secondary' as const },
-  { street: 'High Level Rd', severity: 'HIGH' as const, type: 'Deep rutting detected by fleet collector #08.', color: 'error' as const },
+  { street: 'Duplication Rd', severity: 'HIGH' as const, type: 'Severe Depression detected via smart-cam probe.', color: 'error' as const, lng: 79.8560, lat: 6.8990 },
+  { street: 'Havelock Rd', severity: 'LOW' as const, type: 'Surface Crack identified.', color: 'tertiary' as const, lng: 79.8630, lat: 6.8850 },
+  { street: 'Baseline Rd - Sector C', severity: 'MED' as const, type: 'Edge break & pothole risk detected.', color: 'secondary' as const, lng: 79.8760, lat: 6.9120 },
+  { street: 'High Level Rd', severity: 'HIGH' as const, type: 'Deep rutting detected by fleet collector #08.', color: 'error' as const, lng: 79.8780, lat: 6.8820 },
 ];
 
 export default function DashboardPage() {
+  const mapRef = useRef<MapboxMapRef>(null);
   const [incidents, setIncidents] = useState<Incident[]>(initialIncidents);
+  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
       if (Math.random() > 0.6) {
         const randomItem = samplePool[Math.floor(Math.random() * samplePool.length)];
+        // Slightly randomize coordinate offset to simulate real-time GPS detection
+        const offsetLng = (Math.random() - 0.5) * 0.004;
+        const offsetLat = (Math.random() - 0.5) * 0.004;
+
         const newIncident: Incident = {
           id: Date.now().toString(),
           street: randomItem.street,
@@ -59,6 +69,8 @@ export default function DashboardPage() {
           type: randomItem.type,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
           color: randomItem.color,
+          lng: randomItem.lng + offsetLng,
+          lat: randomItem.lat + offsetLat,
         };
 
         setIncidents((prev) => [newIncident, ...prev.slice(0, 7)]);
@@ -67,6 +79,11 @@ export default function DashboardPage() {
 
     return () => clearInterval(interval);
   }, []);
+
+  const handleFlyTo = (incident: Incident) => {
+    setSelectedIncident(incident);
+    mapRef.current?.flyToIncident(incident);
+  };
 
   return (
     <div className="min-h-screen bg-surface text-on-surface font-sans selection:bg-primary/30">
@@ -222,20 +239,12 @@ export default function DashboardPage() {
         {/* MAP CONTAINER */}
         <div className="flex-1 relative">
           <div className="absolute inset-0 bg-surface-container-lowest">
-            <div className="w-full h-full relative" data-location="Colombo">
-              <div
-                className="w-full h-full bg-cover bg-center grayscale brightness-[0.4] opacity-80"
-                style={{
-                  backgroundImage:
-                    "url('https://lh3.googleusercontent.com/aida-public/AB6AXuDBTkjFRC00n3xtEh5yBT9Jnh6axhoDQYDyZLLhPgLALelEui8Rsn_-HZhj60vnanBXCmsAZynJDxH9UcEH8ndXnzWLIl2ZYg3oU52zPmBlV1YqVzbe8Rcw3LwDfxuH0luHINjVlBVx5S8e7rnfh7ZHOqGMIVpYujjfqB4tJHe_xZyTsqYiN8Zp_ogEGKqQziN8FUAqXVOrPbLUZgNTxeahUiKeFD-6P1tu48qlE6cmUe9sqwLWNYjF')",
-                }}
-              />
-              {/* Pulsating Hotspots */}
-              <div className="absolute top-[35%] left-[45%] w-4 h-4 bg-error rounded-full glow-red pulse-red" />
-              <div className="absolute top-[40%] left-[48%] w-6 h-6 bg-error rounded-full glow-red pulse-red" style={{ animationDelay: '0.5s' }} />
-              <div className="absolute top-[38%] left-[52%] w-3 h-3 bg-error rounded-full glow-red pulse-red" style={{ animationDelay: '1.2s' }} />
-              <div className="absolute top-[60%] left-[25%] w-8 h-8 bg-error/40 rounded-full blur-xl" />
-            </div>
+            <MapboxMap
+              ref={mapRef}
+              incidents={incidents}
+              selectedIncidentId={selectedIncident?.id}
+              onSelectIncident={(inc) => setSelectedIncident(inc)}
+            />
           </div>
 
           {/* LEFT SIDEBAR: LIVE FEED */}
@@ -256,20 +265,21 @@ export default function DashboardPage() {
                   incident.color === 'error'
                     ? 'border-error'
                     : incident.color === 'secondary'
-                    ? 'border-secondary'
-                    : 'border-tertiary';
+                      ? 'border-secondary'
+                      : 'border-tertiary';
 
                 const badgeBg =
                   incident.color === 'error'
                     ? 'bg-error-container/20 text-error'
                     : incident.color === 'secondary'
-                    ? 'bg-secondary-container/20 text-secondary'
-                    : 'bg-tertiary-container/20 text-tertiary';
+                      ? 'bg-secondary-container/20 text-secondary'
+                      : 'bg-tertiary-container/20 text-tertiary';
 
                 return (
                   <div
                     key={incident.id}
-                    className={`p-3 bg-white/5 rounded-lg border-l-4 ${borderClass} hover:bg-white/10 transition-all duration-300 transform translate-y-0 opacity-100`}
+                    className={`p-3 bg-white/5 rounded-lg border-l-4 ${borderClass} hover:bg-white/10 transition-all duration-300 transform translate-y-0 opacity-100 ${selectedIncident?.id === incident.id ? 'ring-1 ring-primary bg-primary/10' : ''
+                      }`}
                   >
                     <div className="flex justify-between items-start mb-1">
                       <span className={`${badgeBg} text-[10px] px-1.5 py-0.5 rounded font-bold uppercase`}>
@@ -280,7 +290,13 @@ export default function DashboardPage() {
                     <div className="text-sm font-bold text-on-surface mb-1">{incident.street}</div>
                     <p className="text-xs text-on-surface-variant leading-relaxed">{incident.type}</p>
                     <div className="mt-2 flex items-center gap-2">
-                      <button className="text-[10px] text-primary hover:underline">View on Map</button>
+                      <button
+                        onClick={() => handleFlyTo(incident)}
+                        className="text-[10px] text-primary hover:underline font-semibold flex items-center gap-0.5"
+                      >
+                        <span className="material-symbols-outlined text-xs">location_on</span>
+                        View on Map
+                      </button>
                       <span className="text-[10px] text-outline">•</span>
                       <button className="text-[10px] text-primary hover:underline">Assign Crew</button>
                     </div>
@@ -297,7 +313,7 @@ export default function DashboardPage() {
           </div>
 
           {/* BOTTOM RIGHT: GEMINI AI PANEL */}
-          <div className="absolute right-6 bottom-6 w-96 glass-panel rounded-2xl shadow-2xl z-20 border-l-2 border-primary overflow-hidden">
+          {/* <div className="absolute right-6 bottom-6 w-96 glass-panel rounded-2xl shadow-2xl z-20 border-l-2 border-primary overflow-hidden">
             <div className="bg-gradient-to-r from-primary/10 to-transparent p-4 flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-primary-container flex items-center justify-center shadow-lg glow-cyan">
                 <span className="material-symbols-outlined text-white text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>
@@ -330,26 +346,42 @@ export default function DashboardPage() {
                 </button>
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* MAP CONTROLS */}
           <div className="absolute right-6 top-6 flex flex-col gap-2 z-20">
             <div className="glass-panel p-2 rounded-lg flex flex-col gap-3">
-              <button className="text-on-surface-variant hover:text-primary transition-colors active:scale-90">
+              <button
+                onClick={() => mapRef.current?.zoomIn()}
+                title="Zoom In"
+                className="text-on-surface-variant hover:text-primary transition-colors active:scale-90"
+              >
                 <span className="material-symbols-outlined">add</span>
               </button>
               <div className="w-full h-px bg-outline-variant/30"></div>
-              <button className="text-on-surface-variant hover:text-primary transition-colors active:scale-90">
+              <button
+                onClick={() => mapRef.current?.zoomOut()}
+                title="Zoom Out"
+                className="text-on-surface-variant hover:text-primary transition-colors active:scale-90"
+              >
                 <span className="material-symbols-outlined">remove</span>
               </button>
             </div>
             <div className="glass-panel p-2 rounded-lg">
-              <button className="text-on-surface-variant hover:text-primary transition-colors active:scale-90">
+              <button
+                onClick={() => mapRef.current?.resetLocation()}
+                title="Reset View"
+                className="text-on-surface-variant hover:text-primary transition-colors active:scale-90"
+              >
                 <span className="material-symbols-outlined">my_location</span>
               </button>
             </div>
             <div className="glass-panel p-2 rounded-lg">
-              <button className="text-on-surface-variant hover:text-primary transition-colors active:scale-90">
+              <button
+                onClick={() => mapRef.current?.toggleStyle()}
+                title="Switch Map Style"
+                className="text-on-surface-variant hover:text-primary transition-colors active:scale-90"
+              >
                 <span className="material-symbols-outlined">layers</span>
               </button>
             </div>
