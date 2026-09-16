@@ -42,6 +42,7 @@ export default function DashboardPage() {
   const [isClustering, setIsClustering] = useState<boolean>(false);
   const [isIngesting, setIsIngesting] = useState<boolean>(false);
   const [notification, setNotification] = useState<string | null>(null);
+  const [backendConnected, setBackendConnected] = useState<boolean | null>(null);
 
   const showToast = (msg: string) => {
     setNotification(msg);
@@ -57,6 +58,12 @@ export default function DashboardPage() {
         fetch('/api/v1/h3/segments?format=json'),
         fetch('/api/v1/analytics'),
       ]);
+
+      if (hazardsRes.ok && analyticsRes.ok) {
+        setBackendConnected(true);
+      } else {
+        setBackendConnected(false);
+      }
 
       if (hazardsRes.ok) {
         const data = await hazardsRes.json();
@@ -75,7 +82,8 @@ export default function DashboardPage() {
         setAnalytics(data.summary || null);
       }
     } catch (err) {
-      console.error('Failed to load dashboard telemetry:', err);
+      console.error('Failed to load dashboard telemetry from Python backend:', err);
+      setBackendConnected(false);
     }
   }, []);
 
@@ -152,7 +160,7 @@ export default function DashboardPage() {
       const randomOffsetLat = (Math.random() - 0.5) * 0.0006;
       const randomOffsetLng = (Math.random() - 0.5) * 0.0006;
 
-      const newUuid = `sim-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
+      const newUuid = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : "550e8400-e29b-41d4-a716-44665544" + Math.floor(Math.random() * 8999 + 1000);
       const payload = {
         device_id_hash: 'a8f9c3d2e1b04567a89b0123c456d789e0123456',
         batch_size: 1,
@@ -282,20 +290,38 @@ export default function DashboardPage() {
         {/* System Telemetry Benchmarks Box */}
         <div className="p-3 mx-3 mb-3 bg-surface-container-lowest/80 border border-outline-variant/30 rounded-xl space-y-2 text-[11px] font-mono">
           <div className="text-[10px] text-primary font-bold uppercase tracking-wider flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            Telemetry Benchmarks
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                backendConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+              }`}
+            ></span>
+            Telemetry Benchmarks (Live)
           </div>
           <div className="flex justify-between text-on-surface-variant">
             <span>GZIP Compression:</span>
-            <strong className="text-emerald-400">78.4% (~3.98 KB)</strong>
+            <strong className="text-emerald-400">
+              {analytics?.telemetry ? `${analytics.telemetry.compression_bandwidth_savings_pct}%` : '—'}
+            </strong>
           </div>
           <div className="flex justify-between text-on-surface-variant">
             <span>Cellular Latency:</span>
-            <strong className="text-on-surface">245 ms ± 38 ms</strong>
+            <strong className="text-on-surface">
+              {analytics?.telemetry ? `${analytics.telemetry.sync_latency_ms} ms` : '—'}
+            </strong>
           </div>
           <div className="flex justify-between text-on-surface-variant">
             <span>Laplacian DP:</span>
-            <strong className="text-cyan-300">ε = 1.0 (b = 15m)</strong>
+            <strong className="text-cyan-300">
+              {analytics?.telemetry
+                ? `ε = ${analytics.telemetry.privacy_epsilon} (b = ${analytics.telemetry.privacy_mean_shift_m}m)`
+                : 'ε = 1.0 (b = 15m)'}
+            </strong>
+          </div>
+          <div className="flex justify-between text-on-surface-variant">
+            <span>Corridor Accuracy:</span>
+            <strong className="text-emerald-400">
+              {analytics?.telemetry ? `${analytics.telemetry.road_corridor_match_accuracy_pct}%` : '—'}
+            </strong>
           </div>
           <div className="flex justify-between text-on-surface-variant">
             <span>PDPA Compliance:</span>
@@ -328,12 +354,35 @@ export default function DashboardPage() {
       <header className="fixed top-0 right-0 w-[calc(100%-16rem)] h-16 bg-surface/90 backdrop-blur-lg border-b border-outline-variant flex items-center justify-between px-6 z-40">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-xs font-mono bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg">
-            <span className="text-gray-400">Target Area:</span>
-            <strong className="text-primary font-semibold">Colombo Urban Network (A2, B084, A4)</strong>
+            <span
+              className={`w-2 h-2 rounded-full ${
+                backendConnected === true
+                  ? 'bg-emerald-400 animate-pulse'
+                  : backendConnected === false
+                  ? 'bg-rose-500'
+                  : 'bg-amber-400 animate-pulse'
+              }`}
+            ></span>
+            <span className="text-gray-400">Python Backend:</span>
+            <strong
+              className={`font-semibold ${
+                backendConnected === true
+                  ? 'text-emerald-400'
+                  : backendConnected === false
+                  ? 'text-rose-400'
+                  : 'text-amber-300'
+              }`}
+            >
+              {backendConnected === true
+                ? 'Live Connected (localhost:8000)'
+                : backendConnected === false
+                ? 'Offline / Connecting (localhost:8000)'
+                : 'Connecting to Backend...'}
+            </strong>
           </div>
           <div className="flex items-center gap-2 text-xs font-mono bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg">
-            <span className="text-gray-400">PostGIS Engine:</span>
-            <strong className="text-emerald-400 font-semibold">PostgreSQL 16 + PostGIS 3.4 + H3</strong>
+            <span className="text-gray-400">Target Network:</span>
+            <strong className="text-primary font-semibold">Colombo Urban Network (A2, B084, A4)</strong>
           </div>
         </div>
 
@@ -400,7 +449,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <div className="text-primary font-mono text-2xl font-bold">
-                {analytics ? `${analytics.network_pci_avg}` : '88.5'}
+                {analytics?.network_pci_avg != null ? `${analytics.network_pci_avg}` : '—'}
                 <span className="text-xs text-gray-400 font-normal"> / 100</span>
               </div>
               <div className="text-on-surface-variant text-[10px] uppercase tracking-wider font-semibold">
@@ -416,7 +465,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <div className="text-tertiary font-mono text-2xl font-bold">
-                {analytics?.active_edge_collectors || 14}
+                {analytics?.active_edge_collectors ?? 0}
                 <span className="text-xs text-gray-400 font-normal"> ({stagedAnomalies.length} staged)</span>
               </div>
               <div className="text-on-surface-variant text-[10px] uppercase tracking-wider font-semibold">
@@ -549,68 +598,88 @@ export default function DashboardPage() {
               {/* Feed List */}
               <div className="flex-1 overflow-y-auto scroll-hide p-3 space-y-2.5">
                 {feedMode === 'verified' ? (
-                  hazards.map((hazard) => {
-                    const isPothole = hazard.primary_class === 'pothole';
-                    const isRepaired = hazard.status === 'REPAIRED';
-                    const isSelected = selectedHazard?.hazard_id === hazard.hazard_id;
+                  hazards.length === 0 ? (
+                    <div className="p-6 text-center text-xs text-on-surface-variant space-y-2.5">
+                      <span className="material-symbols-outlined text-3xl text-gray-500">sensors_off</span>
+                      <p className="font-semibold text-gray-300">No verified hazards yet</p>
+                      <p className="text-[11px] text-gray-400 leading-relaxed">
+                        Database has no clustered hazards. Click <strong>Simulate Mobile Ingest</strong> then <strong>Run DBSCAN Deduplication</strong> to process edge telemetry.
+                      </p>
+                    </div>
+                  ) : (
+                    hazards.map((hazard) => {
+                      const isPothole = hazard.primary_class === 'pothole';
+                      const isRepaired = hazard.status === 'REPAIRED';
+                      const isSelected = selectedHazard?.hazard_id === hazard.hazard_id;
 
-                    return (
+                      return (
+                        <div
+                          key={hazard.hazard_id}
+                          onClick={() => handleSelectHazard(hazard)}
+                          className={`p-3 rounded-xl border-l-4 cursor-pointer transition-all ${
+                            isRepaired
+                              ? 'border-emerald-500 bg-white/5'
+                              : isPothole
+                              ? 'border-error bg-error-container/5 hover:bg-error-container/10'
+                              : 'border-secondary bg-secondary-container/5 hover:bg-secondary-container/10'
+                          } ${isSelected ? 'ring-1 ring-primary bg-primary/10' : ''}`}
+                        >
+                          <div className="flex justify-between items-center mb-1">
+                            <span
+                              className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded uppercase ${
+                                isRepaired
+                                  ? 'bg-emerald-500/20 text-emerald-300'
+                                  : isPothole
+                                  ? 'bg-red-500/20 text-red-300'
+                                  : 'bg-amber-500/20 text-amber-300'
+                              }`}
+                            >
+                              {hazard.status} • {hazard.primary_class}
+                            </span>
+                            <span className="text-[10px] text-cyan-400 font-mono font-bold">
+                              {hazard.detection_count}x hits
+                            </span>
+                          </div>
+                          <div className="text-xs font-bold text-on-surface">{hazard.road_name}</div>
+                          <div className="text-[11px] text-on-surface-variant mt-1 flex justify-between font-mono">
+                            <span>Peak Az: {hazard.max_peak_az} m/s²</span>
+                            <span>Conf: {(hazard.avg_confidence * 100).toFixed(0)}%</span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )
+                ) : (
+                  stagedAnomalies.length === 0 ? (
+                    <div className="p-6 text-center text-xs text-on-surface-variant space-y-2.5">
+                      <span className="material-symbols-outlined text-3xl text-gray-500">wifi_tethering_off</span>
+                      <p className="font-semibold text-gray-300">No staged detections</p>
+                      <p className="text-[11px] text-gray-400 leading-relaxed">
+                        Awaiting incoming edge device batches. Click <strong>Simulate Mobile Ingest</strong> above to stream batches directly to the Python backend.
+                      </p>
+                    </div>
+                  ) : (
+                    stagedAnomalies.map((staged) => (
                       <div
-                        key={hazard.hazard_id}
-                        onClick={() => handleSelectHazard(hazard)}
-                        className={`p-3 rounded-xl border-l-4 cursor-pointer transition-all ${
-                          isRepaired
-                            ? 'border-emerald-500 bg-white/5'
-                            : isPothole
-                            ? 'border-error bg-error-container/5 hover:bg-error-container/10'
-                            : 'border-secondary bg-secondary-container/5 hover:bg-secondary-container/10'
-                        } ${isSelected ? 'ring-1 ring-primary bg-primary/10' : ''}`}
+                        key={staged.uuid}
+                        className="p-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all text-xs"
                       >
                         <div className="flex justify-between items-center mb-1">
-                          <span
-                            className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded uppercase ${
-                              isRepaired
-                                ? 'bg-emerald-500/20 text-emerald-300'
-                                : isPothole
-                                ? 'bg-red-500/20 text-red-300'
-                                : 'bg-amber-500/20 text-amber-300'
-                            }`}
-                          >
-                            {hazard.status} • {hazard.primary_class}
+                          <span className="text-[9px] font-mono text-cyan-300 uppercase">
+                            {staged.class_label} ({staged.mounting_config})
                           </span>
-                          <span className="text-[10px] text-cyan-400 font-mono font-bold">
-                            {hazard.detection_count}x hits
+                          <span className="text-[10px] text-gray-400 font-mono">
+                            {new Date(staged.timestamp_utc).toLocaleTimeString()}
                           </span>
                         </div>
-                        <div className="text-xs font-bold text-on-surface">{hazard.road_name}</div>
-                        <div className="text-[11px] text-on-surface-variant mt-1 flex justify-between font-mono">
-                          <span>Peak Az: {hazard.max_peak_az} m/s²</span>
-                          <span>Conf: {(hazard.avg_confidence * 100).toFixed(0)}%</span>
+                        <div className="font-mono text-[10px] text-gray-400 truncate">UUID: {staged.uuid}</div>
+                        <div className="text-[10px] font-mono text-on-surface-variant mt-1 flex justify-between">
+                          <span>Az: {staged.peak_az_m_s2} m/s²</span>
+                          <span>Speed: {staged.speed_kmh} km/h</span>
                         </div>
                       </div>
-                    );
-                  })
-                ) : (
-                  stagedAnomalies.map((staged) => (
-                    <div
-                      key={staged.uuid}
-                      className="p-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all text-xs"
-                    >
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-[9px] font-mono text-cyan-300 uppercase">
-                          {staged.class_label} ({staged.mounting_config})
-                        </span>
-                        <span className="text-[10px] text-gray-400 font-mono">
-                          {new Date(staged.timestamp_utc).toLocaleTimeString()}
-                        </span>
-                      </div>
-                      <div className="font-mono text-[10px] text-gray-400 truncate">UUID: {staged.uuid}</div>
-                      <div className="text-[10px] font-mono text-on-surface-variant mt-1 flex justify-between">
-                        <span>Az: {staged.peak_az_m_s2} m/s²</span>
-                        <span>Speed: {staged.speed_kmh} km/h</span>
-                      </div>
-                    </div>
-                  ))
+                    ))
+                  )
                 )}
               </div>
             </div>
@@ -778,18 +847,26 @@ export default function DashboardPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5 text-[11px]">
-                    {stagedAnomalies.slice(0, 8).map((staged) => (
-                      <tr key={staged.uuid} className="hover:bg-white/5">
-                        <td className="py-2 text-cyan-300 font-bold truncate max-w-[120px]">{staged.uuid}</td>
-                        <td className="uppercase">{staged.class_label}</td>
-                        <td>{(staged.confidence * 100).toFixed(1)}%</td>
-                        <td>{staged.speed_kmh} km/h</td>
-                        <td className="text-red-400">{staged.peak_az_m_s2} m/s²</td>
-                        <td>{staged.mounting_config}</td>
-                        <td>{staged.h3_index}</td>
-                        <td className="text-gray-400">{staged.latitude_perturbed}, {staged.longitude_perturbed}</td>
+                    {stagedAnomalies.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="py-6 text-center text-gray-400 font-sans text-xs">
+                          No raw staged telemetry records in database yet. Ingest mobile telemetry batches to populate.
+                        </td>
                       </tr>
-                    ))}
+                    ) : (
+                      stagedAnomalies.slice(0, 8).map((staged) => (
+                        <tr key={staged.uuid} className="hover:bg-white/5">
+                          <td className="py-2 text-cyan-300 font-bold truncate max-w-[120px]">{staged.uuid}</td>
+                          <td className="uppercase">{staged.class_label}</td>
+                          <td>{(staged.confidence * 100).toFixed(1)}%</td>
+                          <td>{staged.speed_kmh} km/h</td>
+                          <td className="text-red-400">{staged.peak_az_m_s2} m/s²</td>
+                          <td>{staged.mounting_config}</td>
+                          <td>{staged.h3_index}</td>
+                          <td className="text-gray-400">{staged.latitude_perturbed}, {staged.longitude_perturbed}</td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -819,26 +896,34 @@ export default function DashboardPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5 text-[11px]">
-                    {hazards.map((h) => (
-                      <tr key={h.hazard_id} className="hover:bg-white/5">
-                        <td className="py-2 text-primary font-bold">#{h.hazard_id}</td>
-                        <td className="uppercase">{h.primary_class}</td>
-                        <td className="text-cyan-300 font-bold">{h.detection_count} passes</td>
-                        <td>{(h.avg_confidence * 100).toFixed(1)}%</td>
-                        <td className="text-red-400 font-bold">{h.max_peak_az} m/s²</td>
-                        <td className="text-gray-400">{h.centroid_lat}, {h.centroid_lng}</td>
-                        <td className="text-on-surface">{h.road_name}</td>
-                        <td>
-                          <span
-                            className={`px-1.5 py-0.2 rounded text-[10px] ${
-                              h.status === 'REPAIRED' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'
-                            }`}
-                          >
-                            {h.status}
-                          </span>
+                    {hazards.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="py-6 text-center text-gray-400 font-sans text-xs">
+                          No verified hazards clustered yet. Run DBSCAN Deduplication to cluster staged records.
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      hazards.map((h) => (
+                        <tr key={h.hazard_id} className="hover:bg-white/5">
+                          <td className="py-2 text-primary font-bold">#{h.hazard_id}</td>
+                          <td className="uppercase">{h.primary_class}</td>
+                          <td className="text-cyan-300 font-bold">{h.detection_count} passes</td>
+                          <td>{(h.avg_confidence * 100).toFixed(1)}%</td>
+                          <td className="text-red-400 font-bold">{h.max_peak_az} m/s²</td>
+                          <td className="text-gray-400">{h.centroid_lat}, {h.centroid_lng}</td>
+                          <td className="text-on-surface">{h.road_name}</td>
+                          <td>
+                            <span
+                              className={`px-1.5 py-0.2 rounded text-[10px] ${
+                                h.status === 'REPAIRED' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'
+                              }`}
+                            >
+                              {h.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -867,17 +952,25 @@ export default function DashboardPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5 text-[11px]">
-                    {h3Segments.map((seg) => (
-                      <tr key={seg.h3_index} className="hover:bg-white/5">
-                        <td className="py-2 text-primary font-bold">{seg.h3_index}</td>
-                        <td className="text-on-surface">{seg.road_corridor}</td>
-                        <td className="text-red-400">{seg.total_potholes}</td>
-                        <td className="text-amber-400">{seg.total_speed_bumps}</td>
-                        <td>{seg.avg_impact_severity} m/s²</td>
-                        <td className="font-bold">{seg.pavement_condition_index}</td>
-                        <td className="text-cyan-300">{seg.rda_action}</td>
+                    {h3Segments.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-6 text-center text-gray-400 font-sans text-xs">
+                          No H3 Resolution 9 hex cells aggregated yet. Ingest and cluster telemetry to generate spatial ratings.
+                        </td>
                       </tr>
-                    ))}
+                    ) : (
+                      h3Segments.map((seg) => (
+                        <tr key={seg.h3_index} className="hover:bg-white/5">
+                          <td className="py-2 text-primary font-bold">{seg.h3_index}</td>
+                          <td className="text-on-surface">{seg.road_corridor}</td>
+                          <td className="text-red-400">{seg.total_potholes}</td>
+                          <td className="text-amber-400">{seg.total_speed_bumps}</td>
+                          <td>{seg.avg_impact_severity} m/s²</td>
+                          <td className="font-bold">{seg.pavement_condition_index}</td>
+                          <td className="text-cyan-300">{seg.rda_action}</td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -933,48 +1026,64 @@ export default function DashboardPage() {
               </div>
 
               <div className="space-y-3">
-                {h3Segments
-                  .filter((s) => s.pavement_condition_index < 85)
-                  .sort((a, b) => a.pavement_condition_index - b.pavement_condition_index)
-                  .map((seg, idx) => (
-                    <div
-                      key={seg.h3_index}
-                      className="p-4 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between hover:bg-white/10 transition-all"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-8 h-8 rounded-full bg-primary/20 text-primary font-mono font-bold flex items-center justify-center text-sm">
-                          #{idx + 1}
+                {h3Segments.filter((s) => s.pavement_condition_index < 85).length === 0 ? (
+                  <div className="p-8 rounded-xl bg-white/5 border border-white/10 text-center text-xs text-gray-400 space-y-2">
+                    <span className="material-symbols-outlined text-3xl text-gray-500">task_alt</span>
+                    <p className="font-semibold text-gray-300">
+                      {h3Segments.length === 0
+                        ? 'No road segments recorded in the database yet.'
+                        : 'All monitored corridors operating at optimal pavement condition (PCI ≥ 85).'}
+                    </p>
+                    <p className="text-[11px] text-gray-500">
+                      {h3Segments.length === 0
+                        ? 'Ingest and cluster telemetry to generate spatial defect ratings.'
+                        : 'No emergency asphalt patching or capital resurfacing mandates required at this time.'}
+                    </p>
+                  </div>
+                ) : (
+                  h3Segments
+                    .filter((s) => s.pavement_condition_index < 85)
+                    .sort((a, b) => a.pavement_condition_index - b.pavement_condition_index)
+                    .map((seg, idx) => (
+                      <div
+                        key={seg.h3_index}
+                        className="p-4 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between hover:bg-white/10 transition-all"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-8 h-8 rounded-full bg-primary/20 text-primary font-mono font-bold flex items-center justify-center text-sm">
+                            #{idx + 1}
+                          </div>
+                          <div>
+                            <div className="text-sm font-bold text-on-surface">{seg.road_corridor}</div>
+                            <div className="text-[11px] text-gray-400 font-mono">
+                              H3 Index: {seg.h3_index} • Potholes: {seg.total_potholes} • Bumps: {seg.total_speed_bumps}
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="text-sm font-bold text-on-surface">{seg.road_corridor}</div>
-                          <div className="text-[11px] text-gray-400 font-mono">
-                            H3 Index: {seg.h3_index} • Potholes: {seg.total_potholes} • Bumps: {seg.total_speed_bumps}
+
+                        <div className="flex items-center gap-6">
+                          <div className="text-right">
+                            <div className="text-xs text-gray-400 uppercase font-mono">PCI Score</div>
+                            <div
+                              className={`text-base font-mono font-bold ${
+                                seg.pavement_condition_index < 45
+                                  ? 'text-red-400'
+                                  : seg.pavement_condition_index < 75
+                                  ? 'text-amber-400'
+                                  : 'text-emerald-400'
+                              }`}
+                            >
+                              {seg.pavement_condition_index}
+                            </div>
+                          </div>
+
+                          <div className="px-3 py-1 rounded bg-white/10 text-xs font-bold text-cyan-300 font-mono">
+                            {seg.rda_action}
                           </div>
                         </div>
                       </div>
-
-                      <div className="flex items-center gap-6">
-                        <div className="text-right">
-                          <div className="text-xs text-gray-400 uppercase font-mono">PCI Score</div>
-                          <div
-                            className={`text-base font-mono font-bold ${
-                              seg.pavement_condition_index < 45
-                                ? 'text-red-400'
-                                : seg.pavement_condition_index < 75
-                                ? 'text-amber-400'
-                                : 'text-emerald-400'
-                            }`}
-                          >
-                            {seg.pavement_condition_index}
-                          </div>
-                        </div>
-
-                        <div className="px-3 py-1 rounded bg-white/10 text-xs font-bold text-cyan-300 font-mono">
-                          {seg.rda_action}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                )}
               </div>
             </div>
           </div>
