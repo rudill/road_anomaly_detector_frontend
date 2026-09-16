@@ -52,8 +52,6 @@ A high-performance municipal GIS command center and decision support platform bu
 | `GET` | `/api/v1/analytics` | Returns municipal summary, network PCI, and bitumen allocation queue |
 | `GET` | `/api/v1/export/manifest` | Exports field maintenance manifests as GeoJSON or CSV |
 
-> [!TIP]
-> **Building the Backend?** Refer to [`BACKEND_INTEGRATION_GUIDE.md`](./BACKEND_INTEGRATION_GUIDE.md) for the complete integration contract, PostGIS SQL schema, FastAPI boilerplate, CORS instructions, and failure-prevention checklist.
 
 ---
 
