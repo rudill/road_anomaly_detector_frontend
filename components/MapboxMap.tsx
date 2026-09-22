@@ -338,51 +338,59 @@ export const MapboxMap = forwardRef<MapboxMapRef, MapboxMapProps>(
           </div>
         `;
 
-        // Rich Civil Engineering Telemetry Popup
+        // Friendly Civil Engineering & Municipal Hazard Popup
         const popupContent = document.createElement('div');
-        popupContent.className = 'p-1 text-xs';
+        popupContent.className = 'p-1.5 text-xs';
+        const impactLabel = Number(hazard.max_peak_az) >= 15 ? 'High' : Number(hazard.max_peak_az) >= 10 ? 'Medium' : 'Low';
         popupContent.innerHTML = `
-          <div class="flex items-center justify-between gap-2 mb-1.5">
-            <span class="text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded tracking-wide uppercase ${
               isRepaired
                 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                 : isPothole
                 ? 'bg-red-500/20 text-red-300 border border-red-500/30'
                 : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
             }">
-              ${hazard.status} • ${hazard.primary_class.toUpperCase()}
+              ${isRepaired ? 'Repaired' : 'Active Defect'} • ${isPothole ? 'Pothole' : 'Speed Bump'}
             </span>
-            <span class="text-[10px] font-mono text-cyan-400 font-bold">${hazard.detection_count} Cluster Hits</span>
+            <span class="text-[10px] font-semibold text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/40">
+              ${hazard.detection_count} Citizen ${hazard.detection_count === 1 ? 'Report' : 'Reports'}
+            </span>
           </div>
 
-          <h4 class="font-bold text-sm text-cyan-300 mb-1">${hazard.road_name}</h4>
+          <h4 class="font-bold text-sm text-cyan-300 mb-1 flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-sm text-cyan-400">pin_drop</span>
+            ${hazard.road_name}
+          </h4>
 
-          <div class="grid grid-cols-2 gap-1.5 my-2 p-2 bg-white/5 rounded border border-white/10 font-mono text-[11px]">
+          <div class="grid grid-cols-2 gap-1.5 my-2.5 p-2 bg-white/5 rounded-lg border border-white/10 text-[11px]">
             <div>
-              <span class="text-gray-400 text-[9px] block uppercase">Peak Az Accel</span>
-              <strong class="text-red-400">${hazard.max_peak_az} m/s²</strong>
+              <span class="text-gray-400 text-[9px] block uppercase font-medium">Shock Impact</span>
+              <strong class="${Number(hazard.max_peak_az) >= 15 ? 'text-red-400' : 'text-amber-300'} font-bold">
+                ${hazard.max_peak_az} m/s² <span class="text-[9px] font-normal text-gray-400">(${impactLabel})</span>
+              </strong>
             </div>
             <div>
-              <span class="text-gray-400 text-[9px] block uppercase">Avg Confidence</span>
-              <strong class="text-cyan-300">${(hazard.avg_confidence * 100).toFixed(1)}%</strong>
+              <span class="text-gray-400 text-[9px] block uppercase font-medium">AI Verification</span>
+              <strong class="text-cyan-300 font-bold">${(hazard.avg_confidence * 100).toFixed(0)}% Match</strong>
             </div>
             <div>
-              <span class="text-gray-400 text-[9px] block uppercase">H3 Res 9 Cell</span>
-              <span class="text-gray-300 text-[10px] truncate block">${hazard.h3_index.slice(0, 10)}...</span>
+              <span class="text-gray-400 text-[9px] block uppercase font-medium">Street Zone</span>
+              <span class="text-gray-300 text-[10px] font-mono truncate block">${hazard.h3_index.slice(0, 10)}</span>
             </div>
             <div>
-              <span class="text-gray-400 text-[9px] block uppercase">DBSCAN D_max</span>
-              <span class="text-emerald-400">≤ 5.0m Radius</span>
+              <span class="text-gray-400 text-[9px] block uppercase font-medium">GPS Precision</span>
+              <span class="text-emerald-400 font-medium">Within 5m cluster</span>
             </div>
           </div>
 
-          <div class="flex items-center gap-2 pt-1 border-t border-gray-700">
-            <button id="toggle-status-btn-${hazard.hazard_id}" class="text-[11px] font-bold px-3 py-1.5 rounded transition-all w-full text-center ${
+          <div class="flex items-center gap-2 pt-1 border-t border-gray-700/60">
+            <button id="toggle-status-btn-${hazard.hazard_id}" class="text-[11px] font-bold px-3 py-1.5 rounded-lg transition-all w-full text-center shadow-sm ${
               isRepaired
                 ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40'
                 : 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40'
             }">
-              ${isRepaired ? 'Re-open Hazard' : 'Mark as Repaired'}
+              ${isRepaired ? '↺ Mark as Active Defect' : '✓ Mark Repaired & Safe'}
             </button>
           </div>
         `;
@@ -429,7 +437,7 @@ export const MapboxMap = forwardRef<MapboxMapRef, MapboxMapProps>(
       stagedAnomalies.forEach((staged) => {
         const el = document.createElement('div');
         el.className = 'w-3 h-3 rounded-full bg-cyan-400/80 border border-cyan-200 shadow-sm cursor-pointer hover:scale-150 transition-transform';
-        el.title = `Staged: ${staged.class_label} | Az: ${staged.peak_az_m_s2}m/s² | ${staged.mounting_config}`;
+        el.title = `Incoming Report: ${staged.class_label.toUpperCase()} | Shock Impact: ${staged.peak_az_m_s2} m/s² | Phone: ${staged.mounting_config}`;
 
         const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
           .setLngLat([staged.longitude_perturbed, staged.latitude_perturbed])
