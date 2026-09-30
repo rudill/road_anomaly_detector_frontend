@@ -28,13 +28,13 @@ Next.js automatically proxies all `/api/v1/*` requests to your external backend 
 1. Open or create `.env.local` in the frontend root:
    ```env
    # Point to your standalone backend server (FastAPI, Node, Go)
-   BACKEND_URL=http://localhost:8000
+   BACKEND_URL=http://localhost:8005
    ```
 2. Restart the Next.js dev server (`npm run dev`).
-3. The frontend will make calls to `http://localhost:3000/api/v1/...`, and Next.js will transparently forward them to `http://localhost:8000/api/v1/...`. No CORS configuration is required.
+3. The frontend will make calls to `http://localhost:3000/api/v1/...`, and Next.js will transparently forward them to `http://localhost:8005/api/v1/...`. No CORS configuration is required.
 
 ### Option B: Direct Cross-Origin API Access
-If calling the backend directly from the client browser (`http://localhost:8000`), your backend must send the following HTTP headers:
+If calling the backend directly from the client browser (`http://localhost:8005`), your backend must send the following HTTP headers:
 
 ```http
 Access-Control-Allow-Origin: http://localhost:3000
@@ -558,21 +558,21 @@ Before connecting the frontend, run these `curl` commands against your backend t
 
 ```bash
 # 1. Test Analytics
-curl -s http://localhost:8000/api/v1/analytics | jq .summary
+curl -s http://localhost:8005/api/v1/analytics | jq .summary
 
 # 2. Test H3 GeoJSON FeatureCollection
-curl -s http://localhost:8000/api/v1/h3/segments | jq .features[0].geometry.type
+curl -s http://localhost:8005/api/v1/h3/segments | jq .features[0].geometry.type
 
 # 3. Test Verified Hazards
-curl -s http://localhost:8000/api/v1/hazards/verified | jq .hazards[0]
+curl -s http://localhost:8005/api/v1/hazards/verified | jq .hazards[0]
 
 # 4. Test Ingestion Idempotency (Execute Twice With Same UUID)
-curl -X POST http://localhost:8000/api/v1/anomalies/sync \
+curl -X POST http://localhost:8005/api/v1/anomalies/sync \
   -H "Content-Type: application/json" \
   -d '{"device_id_hash":"test","batch_size":1,"records":[{"uuid":"550e8400-e29b-41d4-a716-446655440000","timestamp_utc":"2026-09-09T14:30:22Z","latitude_perturbed":6.9025,"longitude_perturbed":79.8515,"h3_index":"89611cb0247ffff","class_label":"pothole","confidence":0.92,"speed_kmh":30.0,"peak_az_m_s2":18.0,"mounting_config":"dash_mount"}]}'
 
 # 5. Test Clustering Daemon Trigger
-curl -X POST http://localhost:8000/api/v1/clustering/run
+curl -X POST http://localhost:8005/api/v1/clustering/run
 ```
 
 ---
@@ -581,7 +581,7 @@ curl -X POST http://localhost:8000/api/v1/clustering/run
 
 | Failure Symptom | Root Cause | Solution |
 |---|---|---|
-| **CORS Blocked error in browser console** | Backend lacks `Access-Control-Allow-Origin: http://localhost:3000` | Set `BACKEND_URL=http://localhost:8000` in `.env.local` to use Next.js proxying, or add CORS middleware. |
+| **CORS Blocked error in browser console** | Backend lacks `Access-Control-Allow-Origin: http://localhost:3000` | Set `BACKEND_URL=http://localhost:8005` in `.env.local` to use Next.js proxying, or add CORS middleware. |
 | **Map polygons render in wrong continent / ocean** | Inverted coordinates in GeoJSON | GeoJSON coordinates must be `[longitude, latitude]` (`[79.85, 6.90]`). |
 | **Mapbox crashes with "Unclosed polygon ring"** | First and last coordinate pair do not match | Ensure `coordinates[0][0] == coordinates[0][-1]`. |
 | **Duplicate key error in database during sync** | Missing idempotency handling | Add `ON CONFLICT (uuid) DO NOTHING` to SQL insert. |

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+const rawBackendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'https://onyx-mountain-e6bff16a.tunnl.gg';
+const BACKEND_URL = rawBackendUrl.trim().replace(/\/+$/, '');
 
 /**
  * Universal Reverse Proxy Handler
@@ -23,6 +24,12 @@ async function proxyRequest(
       forwardHeaders.set(key, value);
     }
   });
+
+  // Bypass tunnel warning/interstitial pages (tunnl.gg, ngrok, localtunnel, etc.)
+  forwardHeaders.set('tunnl-skip-browser-warning', '1');
+  forwardHeaders.set('ngrok-skip-browser-warning', '1');
+  forwardHeaders.set('bypass-tunnel-reminder', '1');
+  forwardHeaders.set('user-agent', 'RoadAnomalyFrontendProxy/1.0');
 
   const init: RequestInit = {
     method: request.method,
@@ -69,7 +76,7 @@ async function proxyRequest(
       {
         status: 'ERROR',
         error: 'BACKEND_UNAVAILABLE',
-        message: `Failed to connect to Python backend at ${BACKEND_URL}: ${errorMessage}. Please ensure the Python server (python run.py) is running on port 8000.`,
+        message: `Failed to connect to Python backend at ${BACKEND_URL}: ${errorMessage}. Please ensure the backend server or tunnel is running and reachable.`,
       },
       { status: 502 }
     );

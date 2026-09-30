@@ -18,6 +18,11 @@ const MapboxMap = dynamic(
 
 export type ActiveViewTab = 'map' | 'decision' | 'inventory' | 'how_it_works';
 
+const TUNNEL_BYPASS_HEADERS: HeadersInit = {
+  'tunnl-skip-browser-warning': '1',
+  'ngrok-skip-browser-warning': '1',
+};
+
 export default function DashboardPage() {
   const mapRef = useRef<MapboxMapRef>(null);
 
@@ -58,10 +63,10 @@ export default function DashboardPage() {
   const refreshData = useCallback(async () => {
     try {
       const [hazardsRes, stagedRes, h3Res, analyticsRes] = await Promise.all([
-        fetch('/api/v1/hazards/verified'),
-        fetch('/api/v1/anomalies/staged'),
-        fetch('/api/v1/h3/segments?format=json'),
-        fetch('/api/v1/analytics'),
+        fetch('/api/v1/hazards/verified', { headers: TUNNEL_BYPASS_HEADERS }),
+        fetch('/api/v1/anomalies/staged', { headers: TUNNEL_BYPASS_HEADERS }),
+        fetch('/api/v1/h3/segments?format=json', { headers: TUNNEL_BYPASS_HEADERS }),
+        fetch('/api/v1/analytics', { headers: TUNNEL_BYPASS_HEADERS }),
       ]);
 
       if (hazardsRes.ok && analyticsRes.ok) {
@@ -115,7 +120,7 @@ export default function DashboardPage() {
     try {
       const res = await fetch('/api/v1/hazards/verified', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...TUNNEL_BYPASS_HEADERS },
         body: JSON.stringify({ hazard_id: hazardId, status: nextStatus }),
       });
       if (res.ok) {
@@ -141,7 +146,7 @@ export default function DashboardPage() {
     try {
       const res = await fetch('/api/v1/clustering/run', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...TUNNEL_BYPASS_HEADERS },
         body: JSON.stringify({ d_max_meters: 5.0, min_pts: 3 }),
       });
       const data = await res.json();
@@ -202,6 +207,7 @@ export default function DashboardPage() {
           'Content-Type': 'application/json',
           Authorization: 'Bearer simulated_jwt_token',
           'X-Device-App-Version': '1.0.4',
+          ...TUNNEL_BYPASS_HEADERS,
         },
         body: JSON.stringify(payload),
       });
@@ -396,7 +402,11 @@ export default function DashboardPage() {
                 backendConnected === true ? 'text-emerald-400' : 'text-rose-400'
               }`}
             >
-              {backendConnected === true ? 'Live Connected' : 'Connecting (Port 8000)...'}
+              {backendConnected === true
+                ? 'Live Connected'
+                : backendConnected === false
+                ? 'Offline'
+                : 'Connecting...'}
             </strong>
           </div>
 

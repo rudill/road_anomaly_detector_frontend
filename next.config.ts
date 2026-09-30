@@ -1,19 +1,9 @@
 import type { NextConfig } from "next";
 
-const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL;
-
 const nextConfig: NextConfig = {
-  async rewrites() {
-    if (backendUrl) {
-      return [
-        {
-          source: '/api/v1/:path*',
-          destination: `${backendUrl}/api/v1/:path*`,
-        },
-      ];
-    }
-    return [];
-  },
+  // Requests to /api/v1/* are handled by the App Router universal reverse proxy
+  // at app/api/v1/[...path]/route.ts, which injects tunnel warning bypass headers
+  // (tunnl-skip-browser-warning, ngrok-skip-browser-warning) and handles error reporting.
 };
 
 export default nextConfig;
